@@ -2,6 +2,7 @@
 import Phaser from 'phaser';
 import Card from '../objects/Card';
 import Timeline from '../objects/Timeline';
+import { EnemySpecies } from '../objects/EnemyIntent';
 
 export default class BattleScene extends Phaser.Scene {
     private timeline!: Timeline;
@@ -16,7 +17,7 @@ export default class BattleScene extends Phaser.Scene {
     private isGameStarted: boolean = false;
 
     private defeatedCount: number = 0;
-    private targetDefeatCount: number = 10;
+    private targetDefeatCount: number = 15; 
 
     private hand: Card[] = [];
 
@@ -48,24 +49,24 @@ export default class BattleScene extends Phaser.Scene {
         }).setOrigin(0.5).setStroke('#ffffff', 2).setShadow(0, 0, '#00ffff', 10);
 
         const rules = [
-            '【新システム：激突（クラッシュ）】',
-            '敵を動かして別の敵にぶつけると…両方消滅する！',
-            '「引き寄せ」を使って奥の敵を手前にぶつけろ！',
+            '【新・敵軍団襲来！】',
+            '💣 ボマー（橙）：倒すと大爆発！周りの敵も消し飛ぶぞ！',
+            '🥷 ニンジャ（紫）：足が速い！一気に2マス進んでくる！',
+            '🛡 アーマー（銀）：攻撃無効！物理で倒せ！',
             '',
-            '【要注意：アーマーの敵（銀色）】',
-            '攻撃カードが効かない！',
-            '「壁ドン」か「激突」でしか倒せないぞ。',
+            '【攻略のヒント】',
+            '「引き寄せ」でボマーを敵の群れに放り込め！',
+            '誘爆コンボで一網打尽だ！',
             '',
-            '【ミッション】',
-            '敵を10体撃破せよ'
+            'ミッション：敵を15体撃破せよ'
         ];
 
-        const ruleText = this.add.text(640, 380, rules, {
+        const ruleText = this.add.text(640, 400, rules, {
             fontSize: '22px', color: '#ffffff', align: 'center', lineHeight: 36,
             fontFamily: '"Hiragino Kaku Gothic ProN", "Meiryo", sans-serif'
         }).setOrigin(0.5);
 
-        const startText = this.add.text(640, 620, '- Click to Start -', {
+        const startText = this.add.text(640, 650, '- Click to Start -', {
             fontSize: '32px', color: '#ffff00', fontStyle: 'bold'
         }).setOrigin(0.5);
 
@@ -77,9 +78,7 @@ export default class BattleScene extends Phaser.Scene {
 
         bg.once('pointerdown', () => {
             this.tweens.add({
-                targets: titleContainer,
-                alpha: 0,
-                duration: 500,
+                targets: titleContainer, alpha: 0, duration: 500,
                 onComplete: () => {
                     titleContainer.destroy();
                     this.startGame();
@@ -97,8 +96,7 @@ export default class BattleScene extends Phaser.Scene {
         }).setOrigin(0.5);
 
         this.hpText = this.add.text(50, 50, `HP: ${this.playerHp}`, {
-            fontSize: '40px', color: '#ff4444', fontStyle: 'bold',
-            fontFamily: 'Arial'
+            fontSize: '40px', color: '#ff4444', fontStyle: 'bold', fontFamily: 'Arial'
         });
 
         this.scoreText = this.add.text(640, 50, `撃破: 0 / ${this.targetDefeatCount}`, {
@@ -115,10 +113,9 @@ export default class BattleScene extends Phaser.Scene {
         this.timeline = new Timeline(this, 640, 150);
         this.setupTimelineEvents();
 
-        // 初期配置：アーマーを混ぜる
-        this.timeline.addIntent(this, 0, 'ATTACK', 10);
-        this.timeline.addIntent(this, 2, 'ATTACK', 99, true); // アーマー敵
-        this.timeline.addIntent(this, 3, 'ATTACK', 10);
+        this.timeline.addIntent(this, 0, 'ATTACK', 10, 'NORMAL');
+        this.timeline.addIntent(this, 2, 'ATTACK', 99, 'BOMB'); 
+        this.timeline.addIntent(this, 3, 'ATTACK', 20, 'SPEED'); 
 
         this.events.on('card_clicked', (card: Card) => {
             if (this.isGameOver) return;
@@ -155,18 +152,33 @@ export default class BattleScene extends Phaser.Scene {
                 if (this.isGameOver) return;
                 this.guideText.setText('あなたのターン');
                 
-                // 敵の補充（アーマー敵が出る確率を入れる）
                 if (this.defeatedCount < this.targetDefeatCount) {
-                     const randomVal = Phaser.Math.Between(10, 30);
-                     const isArmor = Phaser.Math.Between(0, 100) < 30; // 30%でアーマー
-                     this.timeline.addIntent(this, 4, 'ATTACK', randomVal, isArmor);
+                     this.spawnEnemy();
                 }
-                
                 this.dealCards();
             });
         });
 
         this.dealCards();
+    }
+
+    private spawnEnemy() {
+        const rand = Phaser.Math.Between(0, 100);
+        let species: EnemySpecies = 'NORMAL';
+        let val = Phaser.Math.Between(10, 30);
+
+        if (rand < 20) {
+            species = 'BOMB'; 
+            val = 50;
+        } else if (rand < 40) {
+            species = 'SPEED'; 
+            val = 15;
+        } else if (rand < 60) {
+            species = 'ARMOR'; 
+            val = 99;
+        }
+
+        this.timeline.addIntent(this, 4, 'ATTACK', val, species);
     }
 
     private setupTimelineEvents() {
@@ -182,29 +194,33 @@ export default class BattleScene extends Phaser.Scene {
 
         this.timeline.on('enemy_defeated', () => {
             if (this.isGameOver) return;
-            
             this.defeatedCount++;
             this.scoreText.setText(`撃破: ${this.defeatedCount} / ${this.targetDefeatCount}`);
             this.tweens.add({
                 targets: this.scoreText, scaleX: 1.5, scaleY: 1.5, duration: 100, yoyo: true
             });
-
-            if (this.defeatedCount >= this.targetDefeatCount) {
-                this.gameClear();
-            }
+            if (this.defeatedCount >= this.targetDefeatCount) this.gameClear();
         });
 
-        // アーマーに攻撃した時のメッセージ
         this.timeline.on('armor_hit', () => {
-            const warning = this.add.text(640, 300, '無効！アーマーだ！', {
-                fontSize: '40px', color: '#aaaaaa', fontStyle: 'bold',
-                fontFamily: '"Hiragino Kaku Gothic ProN", "Meiryo", sans-serif'
-            }).setOrigin(0.5).setStroke('#000000', 4);
-            
-            this.tweens.add({
-                targets: warning, y: 250, alpha: 0, duration: 1000,
-                onComplete: () => warning.destroy()
-            });
+            this.showToast('無効！アーマーだ！', '#aaaaaa');
+        });
+
+        this.timeline.on('bomb_exploded', () => {
+            this.showToast('誘爆！！', '#ff8800');
+            this.cameras.main.shake(300, 0.02); 
+        });
+    }
+
+    private showToast(message: string, color: string) {
+        const text = this.add.text(640, 300, message, {
+            fontSize: '40px', color: color, fontStyle: 'bold',
+            fontFamily: '"Hiragino Kaku Gothic ProN", "Meiryo", sans-serif'
+        }).setOrigin(0.5).setStroke('#000000', 4);
+        
+        this.tweens.add({
+            targets: text, y: 250, alpha: 0, duration: 1000,
+            onComplete: () => text.destroy()
         });
     }
 
@@ -224,13 +240,11 @@ export default class BattleScene extends Phaser.Scene {
         const startX = 400;
         const y = 650;
         const gap = 150;
-        
         const cardTypes = [
             { name: '突き飛ばし', color: 0xff0000 },
             { name: '引き寄せ', color: 0x0000ff },
             { name: '攻撃', color: 0x00ff00 }
         ];
-
         for(let i=0; i<3; i++) {
             const type = Phaser.Math.RND.pick(cardTypes);
             const card = new Card(this, startX + (i * gap), y, type.name, type.color);
@@ -251,7 +265,6 @@ export default class BattleScene extends Phaser.Scene {
             fontSize: '80px', color: '#ff0000', fontStyle: 'bold',
             fontFamily: '"Hiragino Kaku Gothic ProN", "Meiryo", sans-serif'
         }).setOrigin(0.5).setStroke('#ffffff', 5);
-
         this.createRetryButton('もう一度遊ぶ');
     }
 
@@ -259,10 +272,8 @@ export default class BattleScene extends Phaser.Scene {
         this.isGameOver = true;
         this.cameras.main.flash(500, 255, 255, 255);
         this.add.text(640, 300, 'MISSION COMPLETE!', {
-            fontSize: '80px', color: '#ffff00', fontStyle: 'bold',
-            fontFamily: 'Arial'
+            fontSize: '80px', color: '#ffff00', fontStyle: 'bold', fontFamily: 'Arial'
         }).setOrigin(0.5).setStroke('#ff8800', 5);
-
         this.createRetryButton('次のミッションへ');
     }
 
