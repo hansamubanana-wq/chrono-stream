@@ -2,17 +2,17 @@
 import Phaser from 'phaser';
 
 export type IntentType = 'ATTACK' | 'DEFEND';
-export type EnemySpecies = 'NORMAL' | 'ARMOR' | 'BOMB' | 'SPEED' | 'KING';
+// ★HACKERを追加
+export type EnemySpecies = 'NORMAL' | 'ARMOR' | 'BOMB' | 'SPEED' | 'KING' | 'HACKER';
 
 export default class EnemyIntent extends Phaser.GameObjects.Container {
     public intentType: IntentType;
     public value: number;
     public species: EnemySpecies;
     
-    // ★追加：スタン状態フラグ
     public isStunned: boolean = false;
     private statusText: Phaser.GameObjects.Text;
-
+    private valueText: Phaser.GameObjects.Text; // 数値更新用に保持
     private baseGraphics: Phaser.GameObjects.Graphics;
 
     constructor(scene: Phaser.Scene, type: IntentType, value: number, species: EnemySpecies = 'NORMAL') {
@@ -25,7 +25,8 @@ export default class EnemyIntent extends Phaser.GameObjects.Container {
         this.baseGraphics = scene.add.graphics();
         this.drawEnemyShape(species);
 
-        const valueText = scene.add.text(0, -5, value.toString(), {
+        // 数値テキスト
+        this.valueText = scene.add.text(0, -5, value.toString(), {
             fontSize: '28px', color: '#ffffff', fontStyle: 'bold',
             fontFamily: '"Orbitron", sans-serif'
         }).setOrigin(0.5).setStroke('#000000', 4);
@@ -38,37 +39,48 @@ export default class EnemyIntent extends Phaser.GameObjects.Container {
         else if (species === 'BOMB') { labelStr = '💣'; labelSize = '20px'; labelY = 15; }
         else if (species === 'SPEED') labelStr = 'BOOST';
         else if (species === 'KING') { labelStr = '👑'; labelSize = '28px'; labelY = 15; }
+        else if (species === 'HACKER') { labelStr = '👾'; labelSize = '24px'; labelY = 15; } // ★ハッカー
 
         const typeText = scene.add.text(0, labelY, labelStr, {
             fontSize: labelSize, color: '#ffffff', fontStyle: 'bold',
             fontFamily: '"Orbitron", sans-serif'
         }).setOrigin(0.5).setStroke('#000000', 3);
 
-        if (species === 'KING') {
+        if (species === 'KING' || species === 'HACKER') {
             scene.tweens.add({
                 targets: this, y: '-=10', duration: 1000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut'
             });
         }
 
-        // ★追加：状態異常表示用のテキスト（初期は非表示）
         this.statusText = scene.add.text(0, -35, '', {
             fontSize: '32px', color: '#ffff00', fontStyle: 'bold'
         }).setOrigin(0.5).setStroke('#000000', 4);
 
-        this.add([this.baseGraphics, valueText, typeText, this.statusText]);
+        this.add([this.baseGraphics, this.valueText, typeText, this.statusText]);
         scene.add.existing(this);
     }
 
-    // ★追加：スタン状態の切り替え
     public setStun(enabled: boolean) {
         this.isStunned = enabled;
         if (enabled) {
             this.statusText.setText('💤');
-            this.baseGraphics.alpha = 0.5; // 色を暗くする
+            this.baseGraphics.alpha = 0.5;
         } else {
             this.statusText.setText('');
             this.baseGraphics.alpha = 1.0;
         }
+    }
+
+    // ★追加：パワーアップ（激怒）処理
+    public buffValue(amount: number) {
+        this.value += amount;
+        this.valueText.setText(this.value.toString());
+        this.valueText.setColor('#ff0000'); // 赤文字で警告
+        
+        // 演出
+        this.scene.tweens.add({
+            targets: this.valueText, scaleX: 1.5, scaleY: 1.5, duration: 200, yoyo: true
+        });
     }
 
     private drawEnemyShape(species: EnemySpecies) {
@@ -117,6 +129,18 @@ export default class EnemyIntent extends Phaser.GameObjects.Container {
                 g.beginPath();
                 g.moveTo(40, 0); g.lineTo(-30, -25); g.lineTo(-15, 0); g.lineTo(-30, 25);
                 g.closePath(); g.fillPath(); g.strokePath();
+                break;
+            
+            case 'HACKER': // ★ハッカーの見た目（緑のデジタル風）
+                color = 0x00ff00; lineColor = 0x003300;
+                g.fillStyle(0x000000, 1); g.lineStyle(2, 0x00ff00);
+                g.fillRect(-30, -30, 60, 60);
+                g.strokeRect(-30, -30, 60, 60);
+                // 謎の文字
+                g.fillStyle(0x00ff00);
+                g.fillRect(-20, -10, 40, 5);
+                g.fillRect(-20, 0, 30, 5);
+                g.fillRect(-20, 10, 20, 5);
                 break;
 
             case 'KING':

@@ -6,9 +6,8 @@ type IntentType = 'ATTACK' | 'DEFEND';
 
 export default class Timeline extends Phaser.GameObjects.Container {
     private slots: Phaser.GameObjects.Graphics[] = [];
-    private intents: (EnemyIntent | null)[] = [];
+    public intents: (EnemyIntent | null)[] = []; // 外部からアクセスするためpublicに変更
     
-    // ★変更：スロット数を5から4に減らす（難易度アップ）
     private slotCount: number = 4;
     private slotSize: number = 80;
     private gap: number = 15;
@@ -17,11 +16,9 @@ export default class Timeline extends Phaser.GameObjects.Container {
 
     constructor(scene: Phaser.Scene, x: number, y: number) {
         super(scene, x, y);
-
         for(let i=0; i<this.slotCount; i++) {
             this.intents.push(null);
         }
-
         this.createSlots(scene);
         scene.add.existing(this);
     }
@@ -224,6 +221,20 @@ export default class Timeline extends Phaser.GameObjects.Container {
         scene.tweens.add({
             targets: currentIntent, x: targetSlot.x, y: targetSlot.y, duration: 200, ease: 'Power2'
         });
+    }
+
+    // ★追加：ターン終了時の敵全体強化（激怒）
+    public applyRage(amount: number) {
+        this.intents.forEach(intent => {
+            if (intent) {
+                intent.buffValue(amount);
+            }
+        });
+    }
+
+    // ★追加：ハッカーがいるかチェック
+    public hasHacker(): boolean {
+        return this.intents.some(intent => intent !== null && intent.species === 'HACKER');
     }
 
     public advanceTimeline(scene: Phaser.Scene) {

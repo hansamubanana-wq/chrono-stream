@@ -68,15 +68,16 @@ export default class BattleScene extends Phaser.Scene {
         }).setOrigin(0.5).setStroke('#ffffff', 3).setShadow(0, 0, '#00ffff', 20);
 
         const rules = [
-            '【DANGER: 敵接近速度上昇】',
-            '防衛ラインが突破されました。',
-            '敵は至近距離に出現します。',
+            '【WARNING: 難易度上昇】',
+            '敵の自己進化を確認。毎ターン攻撃力が上昇します。',
+            '👾 ハッカー出現: 生存中、手札に[BUG]を混ぜます。',
+            '[BUG]カード: コスト1。効果なし。ただのゴミ。',
             '',
-            'タイムライン短縮: 5マス -> 4マス',
-            '即死圏内まであとわずかです。',
+            'Cost 1: 突き飛ばし / 引き寄せ',
+            'Cost 2: 攻撃 / スタン',
+            'Cost 3: サンダー',
             '',
-            'エネルギー管理と状態異常を駆使し、',
-            '生き延びてください。'
+            '早急にハッカーを排除し、進化する前に敵を殲滅せよ。'
         ];
 
         const ruleText = this.add.text(640, 400, rules, {
@@ -134,9 +135,21 @@ export default class BattleScene extends Phaser.Scene {
         this.events.on('card_clicked', (card: Card) => {
             if (this.isGameOver) return;
             
+            // ★バグカードは使えないが、捨てるのにコスト1かかる（ここでは使用不可として実装し、コストを払って消すロジックにするか？）
+            // 今回は「使用して消滅させる（効果なし）」とする
             if (this.currentEnergy < card.cost) {
                 this.showToast('INSUFFICIENT ENERGY!', '#ff0000');
                 this.cameras.main.shake(100, 0.005);
+                return;
+            }
+
+            // バグカードの場合
+            if (card.cardName === 'BUG') {
+                this.currentEnergy -= card.cost;
+                this.updateEnergyDisplay();
+                card.playUseAnimation();
+                this.hand = this.hand.filter(c => c !== card);
+                this.showToast('BUG REMOVED', '#00ff00');
                 return;
             }
 
@@ -174,6 +187,11 @@ export default class BattleScene extends Phaser.Scene {
             
             this.time.delayedCall(1000, () => {
                 if (this.isGameOver) return;
+                
+                // ★敵の強化（激怒）
+                const rageAmount = 10;
+                this.timeline.applyRage(rageAmount);
+
                 this.turnCount++;
                 this.turnCountText.setText(`CYCLE: ${this.turnCount}`);
                 
@@ -198,25 +216,22 @@ export default class BattleScene extends Phaser.Scene {
     }
 
     private spawnEnemies(count: number) {
-        // 魔王降臨チェック
         if (this.defeatedCount >= this.targetDefeatCount - 1) {
-             // ★魔王は一番奥(T3)に出現
              this.timeline.addIntent(this, 3, 'ATTACK', 999, 'KING');
              this.showToast('WARNING: CLASS-X "KING"', '#ff00ff');
              return;
         }
-
         for(let i=0; i<count; i++) {
-            // ★変更：出現位置を T1, T2, T3 からランダムに選ぶ（T0は避ける）
-            // T1(手前)に出ると、次のターン攻撃されるのでかなり危険！
             const targetIndex = Phaser.Math.Between(1, 3); 
-            
             const rand = Phaser.Math.Between(0, 100);
             let species: EnemySpecies = 'NORMAL';
             let val = Phaser.Math.Between(10, 30);
+            
             if (rand < 20) { species = 'BOMB'; val = 50; }
-            else if (rand < 40) { species = 'SPEED'; val = 15; }
-            else if (rand < 60) { species = 'ARMOR'; val = 99; }
+            else if (rand < 35) { species = 'SPEED'; val = 15; }
+            else if (rand < 50) { species = 'ARMOR'; val = 99; }
+            else if (rand < 65) { species = 'HACKER'; val = 10; } // ★ハッカー出現率15%
+            
             this.timeline.addIntent(this, targetIndex, 'ATTACK', val, species);
         }
     }
@@ -269,9 +284,18 @@ export default class BattleScene extends Phaser.Scene {
             { name: 'サンダー', color: 0xaa00ff, cost: 3 },
             { name: 'スタン', color: 0xffff00, cost: 2 }
         ];
+
+        // ★ハッカーチェック
+        const hasHacker = this.timeline.hasHacker();
         
         for(let i=0; i<5; i++) {
-            const type = Phaser.Math.RND.pick(cardTypes);
+            let type = Phaser.Math.RND.pick(cardTypes);
+            
+            // ハッカーがいる場合、40%の確率でカードが「バグ」に化ける
+            if (hasHacker && Phaser.Math.Between(0, 100) < 40) {
+                type = { name: 'BUG', color: 0x444444, cost: 1 };
+            }
+
             new Card(this, startX + (i * gap), y, type.name, type.color, type.cost);
             this.hand.push(this.children.last as Card);
         }
