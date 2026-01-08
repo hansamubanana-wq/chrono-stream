@@ -2,7 +2,6 @@
 import Phaser from 'phaser';
 import Card from '../objects/Card';
 import Timeline from '../objects/Timeline';
-// ★ここを修正！ type をつける
 import { type EnemySpecies } from '../objects/EnemyIntent';
 
 export default class BattleScene extends Phaser.Scene {
@@ -15,7 +14,8 @@ export default class BattleScene extends Phaser.Scene {
 
     private playerHp: number = 100;
     private isGameOver: boolean = false;
-    private isGameStarted: boolean = false;
+    
+    // ★修正1: 使っていなかった isGameStarted を削除しました
 
     private defeatedCount: number = 0;
     private targetDefeatCount: number = 15; 
@@ -28,7 +28,6 @@ export default class BattleScene extends Phaser.Scene {
 
     create() {
         this.isGameOver = false;
-        this.isGameStarted = false;
         this.playerHp = 100;
         this.defeatedCount = 0;
         this.hand = [];
@@ -62,8 +61,9 @@ export default class BattleScene extends Phaser.Scene {
             'ミッション：敵を15体撃破せよ'
         ];
 
+        // ★修正2: lineHeight を lineSpacing に変更 (行間)
         const ruleText = this.add.text(640, 400, rules, {
-            fontSize: '22px', color: '#ffffff', align: 'center', lineHeight: 36,
+            fontSize: '22px', color: '#ffffff', align: 'center', lineSpacing: 16,
             fontFamily: '"Hiragino Kaku Gothic ProN", "Meiryo", sans-serif'
         }).setOrigin(0.5);
 
@@ -89,8 +89,6 @@ export default class BattleScene extends Phaser.Scene {
     }
 
     private startGame() {
-        this.isGameStarted = true;
-
         this.guideText = this.add.text(640, 550, 'カードを選んでください', {
             fontSize: '24px', color: '#ffff00', fontStyle: 'bold',
             fontFamily: '"Hiragino Kaku Gothic ProN", "Meiryo", sans-serif'
@@ -229,9 +227,10 @@ export default class BattleScene extends Phaser.Scene {
         this.add.grid(640, 360, 1280, 720, 50, 50, 0x000000, 0, 0x004444, 0.2);
     }
 
+    // ★修正3: add: false を削除 (make.graphics はデフォルトで追加されないため)
     private createTexture() {
         if (this.textures.exists('spark')) return;
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
+        const graphics = this.make.graphics({ x: 0, y: 0 });
         graphics.fillStyle(0xffcc00, 1);
         graphics.fillCircle(4, 4, 4);
         graphics.generateTexture('spark', 8, 8);
