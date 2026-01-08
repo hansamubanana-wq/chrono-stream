@@ -2,8 +2,12 @@
 import Phaser from 'phaser';
 
 export default class Card extends Phaser.GameObjects.Container {
+    private cardName: string; // カードの種類を覚えておく変数
+
     constructor(scene: Phaser.Scene, x: number, y: number, text: string, color: number) {
         super(scene, x, y);
+
+        this.cardName = text; // 名前を保存（例："Push"）
 
         const width = 120;
         const height = 180;
@@ -27,79 +31,68 @@ export default class Card extends Phaser.GameObjects.Container {
         this.add([bg, border, nameText]);
         scene.add.existing(this);
 
-        // --- ここから追加：インタラクション設定 ---
-
-        // 1. クリック判定領域のサイズを設定（これがないと反応しません）
+        // --- インタラクション設定 ---
         this.setSize(width, height);
-
-        // 2. 入力を有効化（カーソルが指マークになります）
         this.setInteractive({ useHandCursor: true });
 
-        // 3. イベントリスナー（動きの設定）
-        
-        // マウスが乗ったとき (Hover)
+        // ホバー時の動き
         this.on('pointerover', () => {
-            // 少し拡大するアニメーション
             scene.tweens.add({
-                targets: this,      // 動かす対象（自分自身）
-                scaleX: 1.1,        // 横に1.1倍
-                scaleY: 1.1,        // 縦に1.1倍
-                y: y - 20,          // 少し上に浮かせる
-                duration: 100,      // 0.1秒かけて変化
-                ease: 'Power1'      // 動きの加減速（滑らかに）
+                targets: this,
+                scaleX: 1.1,
+                scaleY: 1.1,
+                y: y - 20,
+                duration: 100,
+                ease: 'Power1'
             });
-            // 重なり順を一番手前にする（隣のカードに隠れないように）
             scene.children.bringToTop(this);
         });
 
-        // マウスが外れたとき (Out)
+        // ホバー解除時の動き
         this.on('pointerout', () => {
-            // 元のサイズと位置に戻す
             scene.tweens.add({
                 targets: this,
                 scaleX: 1.0,
                 scaleY: 1.0,
-                y: y,               // 元の高さに戻す
+                y: y,
                 duration: 100,
                 ease: 'Power1'
             });
         });
 
-        // クリックされたとき (Click / Tap)
+        // クリック時の動き
         this.on('pointerdown', () => {
             this.playUseAnimation(scene);
         });
     }
 
-    // カードを使用したときのアニメーションメソッド
+    // カード使用アニメーション
     playUseAnimation(scene: Phaser.Scene) {
-        // インタラクションを一時無効化（連打防止）
-        this.disableInteractive();
+        this.disableInteractive(); // 連打防止
 
         scene.tweens.add({
             targets: this,
-            y: this.y - 100, // 大きく上に移動
-            alpha: 0,        // 透明にする（消える）
+            y: this.y - 100,
+            alpha: 0,
             scaleX: 1.2,
             scaleY: 1.2,
-            duration: 300,   // 0.3秒
+            duration: 300,
             onComplete: () => {
-                // アニメーション完了後の処理
-                console.log('Card Used!');
-                // ここで本来は「敵にダメージ」などの処理が入ります
+                // ★ここが重要：使い終わったらシーンに通知を送る！
+                // "use_card" というイベント名で、このカードの名前を送ります
+                scene.events.emit('use_card', this.cardName);
                 
-                // 一旦テスト用に復活させる（実際のゲームでは destroy() で消します）
-                this.resetCard(); // ★変更点1：引数 scene を削除
+                // テスト用にカードを復活させる
+                this.resetCard(); 
             }
         });
     }
 
-    // テスト用：カードを元の位置に戻す
-    resetCard() { // ★変更点2：引数 (scene: Phaser.Scene) を削除
-        this.y += 100; // 位置を戻す（playUseAnimationでの移動分）
+    resetCard() {
+        this.y += 100;
         this.alpha = 1;
         this.scaleX = 1;
         this.scaleY = 1;
-        this.setInteractive(); // 再びクリック可能に
+        this.setInteractive();
     }
 }
