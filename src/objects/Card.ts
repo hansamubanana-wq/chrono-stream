@@ -89,13 +89,13 @@ export default class Card extends Phaser.GameObjects.Container {
                 // ここで本来は「敵にダメージ」などの処理が入ります
                 
                 // 一旦テスト用に復活させる（実際のゲームでは destroy() で消します）
-                this.resetCard(scene); 
+                this.resetCard(); // ★変更点1：引数 scene を削除
             }
         });
     }
 
     // テスト用：カードを元の位置に戻す
-    resetCard(scene: Phaser.Scene) {
+    resetCard() { // ★変更点2：引数 (scene: Phaser.Scene) を削除
         this.y += 100; // 位置を戻す（playUseAnimationでの移動分）
         this.alpha = 1;
         this.scaleX = 1;
