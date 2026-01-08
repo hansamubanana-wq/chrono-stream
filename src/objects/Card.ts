@@ -2,33 +2,40 @@
 import Phaser from 'phaser';
 
 export default class Card extends Phaser.GameObjects.Container {
-    public cardName: string; // 外部から名前を見れるようにpublicにする
+    public cardName: string;
 
     constructor(scene: Phaser.Scene, x: number, y: number, text: string, color: number) {
         super(scene, x, y);
 
         this.cardName = text;
-
         const width = 120;
         const height = 180;
 
         // --- 描画処理 ---
+        // カードの影
+        const shadow = scene.add.graphics();
+        shadow.fillStyle(0x000000, 0.5);
+        shadow.fillRoundedRect(-width / 2 + 5, -height / 2 + 5, width, height, 10);
+        
+        // カード背景
         const bg = scene.add.graphics();
         bg.fillStyle(0xffffff, 1);
         bg.fillRoundedRect(-width / 2, -height / 2, width, height, 10);
         
+        // 枠線
         const border = scene.add.graphics();
         border.lineStyle(4, color, 1);
         border.strokeRoundedRect(-width / 2, -height / 2, width, height, 10);
 
+        // カード名（日本語フォント対応）
         const nameText = scene.add.text(0, 0, text, {
-            fontSize: '18px',
+            fontSize: '20px',
             color: '#000000',
             fontStyle: 'bold',
-            fontFamily: 'Arial'
+            fontFamily: '"Hiragino Kaku Gothic ProN", "Meiryo", sans-serif'
         }).setOrigin(0.5);
 
-        this.add([bg, border, nameText]);
+        this.add([shadow, bg, border, nameText]);
         scene.add.existing(this);
 
         // --- インタラクション設定 ---
@@ -37,27 +44,23 @@ export default class Card extends Phaser.GameObjects.Container {
 
         // ホバー時の動き
         this.on('pointerover', () => {
-            this.y -= 20; // シンプルに座標操作だけにする（Tweenが重複するとバグりやすいため）
+            this.y -= 20;
             scene.children.bringToTop(this);
         });
 
-        // ホバー解除
         this.on('pointerout', () => {
             this.y += 20;
         });
 
-        // ★変更点：クリックされたら「即発動」せず、「選択されたよ」と報告するだけ
+        // クリック時
         this.on('pointerdown', () => {
-            // 'card_clicked' というイベントで、自分自身(this)を送る
             scene.events.emit('card_clicked', this);
         });
     }
 
-    // ★新機能：外部から「使われたよ」と命令されたら動く
     playUseAnimation() {
-        this.disableInteractive(); // もう押せないようにする
+        this.disableInteractive();
 
-        // シーン(this.scene)を使ってアニメーション
         this.scene.tweens.add({
             targets: this,
             y: this.y - 100,
@@ -66,17 +69,8 @@ export default class Card extends Phaser.GameObjects.Container {
             scaleY: 1.2,
             duration: 300,
             onComplete: () => {
-                // アニメーション完了後、テスト用に復活させる
-                this.resetCard();
+                this.destroy();
             }
         });
-    }
-
-    resetCard() {
-        this.y += 100;
-        this.alpha = 1;
-        this.scaleX = 1;
-        this.scaleY = 1;
-        this.setInteractive();
     }
 }
