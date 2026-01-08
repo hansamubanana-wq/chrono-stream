@@ -8,15 +8,19 @@ export default class BattleScene extends Phaser.Scene {
     private selectedCard: Card | null = null;
     private guideText!: Phaser.GameObjects.Text;
 
-    // ★追加：HP管理用
     private playerHp: number = 100;
     private hpText!: Phaser.GameObjects.Text;
+    
+    // ゲームオーバー状態かどうかのフラグ
+    private isGameOver: boolean = false;
 
     constructor() {
         super('BattleScene');
     }
 
     create() {
+        this.isGameOver = false; // 初期化
+        this.playerHp = 100;     // HPリセット
         this.cameras.main.setBackgroundColor('#222222');
 
         // --- UI設定 ---
@@ -24,7 +28,6 @@ export default class BattleScene extends Phaser.Scene {
             fontSize: '24px', color: '#ffff00', fontStyle: 'bold'
         }).setOrigin(0.5);
 
-        // HP表示
         this.hpText = this.add.text(50, 50, `HP: ${this.playerHp}`, {
             fontSize: '40px', color: '#ff0000', fontStyle: 'bold'
         });
@@ -40,69 +43,98 @@ export default class BattleScene extends Phaser.Scene {
         // --- 1. タイムライン ---
         this.timeline = new Timeline(this, 640, 150);
 
-        // ★重要：敵が動いて攻撃してきたときの処理を受け取る
+        // ★敵の攻撃を受け取る処理
         this.timeline.on('enemy_action', (type: string, value: number) => {
+            if (this.isGameOver) return; // ゲームオーバーなら何もしない
+
             if (type === 'ATTACK') {
                 this.playerHp -= value;
-                this.cameras.main.shake(200, 0.01); // ダメージ演出（画面揺れ）
+                this.cameras.main.shake(200, 0.01);
             }
             this.hpText.setText(`HP: ${this.playerHp}`);
-            console.log(`Enemy Action: ${type} -> ${value} Damage!`);
+            
+            // ★HPチェック（ここが追加点）
+            if (this.playerHp <= 0) {
+                this.gameOver();
+            }
         });
 
-        // --- 2. 敵配置（テスト用） ---
-        this.timeline.addIntent(this, 0, 'ATTACK', 10); // すぐ目の前にいる敵
+        // --- 2. 敵配置 ---
+        this.timeline.addIntent(this, 0, 'ATTACK', 10);
         this.timeline.addIntent(this, 1, 'ATTACK', 20);
         this.timeline.addIntent(this, 3, 'DEFEND', 5);
 
-        // ターン終了ボタンが押されたら
+        // --- 3. ターン終了ボタン ---
         endTurnBtn.on('pointerdown', () => {
-            console.log('--- Turn End ---');
+            if (this.isGameOver) return; // ゲームオーバーなら押せない
+
             this.selectedCard = null;
             this.guideText.setText('Enemy Turn...');
             
-            // タイムラインを進める
             this.timeline.advanceTimeline(this);
             
-            // 少し待ってからテキストを戻す
             this.time.delayedCall(1000, () => {
-                this.guideText.setText('Your Turn');
+                if (this.isGameOver) return; // 生きていればターン継続
                 
-                // ★おまけ：敵が減ったら補充してみる（無限湧きテスト）
-                const randomVal = Phaser.Math.Between(5, 15);
+                this.guideText.setText('Your Turn');
+                // 敵の補充（無限湧き）
+                const randomVal = Phaser.Math.Between(10, 30);
                 this.timeline.addIntent(this, 4, 'ATTACK', randomVal);
             });
         });
 
-        // --- 3. カードイベント ---
+        // --- 4. カードイベント ---
         this.events.on('card_clicked', (card: Card) => {
+            if (this.isGameOver) return;
             this.selectedCard = card;
             this.guideText.setText(`Selected: ${card.cardName} >> Click a Target Slot!`);
         });
 
-        // --- 4. タイムライン操作 ---
+        // --- 5. タイムライン操作 ---
         this.timeline.onClickSlot = (index) => {
-            if (!this.selectedCard) return;
+            if (this.isGameOver || !this.selectedCard) return;
 
             const name = this.selectedCard.cardName;
             if (name === 'Push') this.timeline.tryMoveIntent(this, index, 1);
             else if (name === 'Pull') this.timeline.tryMoveIntent(this, index, -1);
-            else if (name === 'Attack') {
-                // 攻撃カードならその敵を消してみるテスト
-                // this.timeline.addIntent(this, index, 'ATTACK', 0); // (実装省略: まだ消す機能がないので上書きなど)
-            }
+            // Attackなどはまだ未実装
 
             this.selectedCard.playUseAnimation();
             this.selectedCard = null;
             this.guideText.setText('Select a Card...');
         };
 
-        // --- 5. 手札 ---
+        // --- 6. 手札 ---
         const startX = 400;
         const y = 650;
         const gap = 150;
         new Card(this, startX, y, 'Push', 0xff0000);
         new Card(this, startX + gap, y, 'Pull', 0x0000ff);
         new Card(this, startX + gap * 2, y, 'Attack', 0x00ff00); 
+    }
+
+    // ★新機能：ゲームオーバー演出
+    private gameOver() {
+        this.isGameOver = true;
+        this.hpText.setText('HP: 0');
+        
+        // 画面を少し赤くする
+        this.cameras.main.flash(500, 255, 0, 0);
+
+        // ドーンと文字表示
+        this.add.text(640, 300, 'GAME OVER', {
+            fontSize: '80px', color: '#ff0000', fontStyle: 'bold'
+        }).setOrigin(0.5).setStroke('#ffffff', 5);
+
+        // リトライボタン
+        const retryBtn = this.add.text(640, 450, 'TRY AGAIN', {
+            fontSize: '32px', color: '#ffffff', backgroundColor: '#000000',
+            padding: { left: 20, right: 20, top: 10, bottom: 10 }
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+        retryBtn.on('pointerdown', () => {
+            // シーンを再起動（最初からになる）
+            this.scene.restart();
+        });
     }
 }
