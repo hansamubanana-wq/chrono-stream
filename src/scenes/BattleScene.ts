@@ -2,7 +2,8 @@
 import Phaser from 'phaser';
 import Card from '../objects/Card';
 import Timeline from '../objects/Timeline';
-import { EnemySpecies } from '../objects/EnemyIntent';
+// ★ここを修正！ type をつける
+import { type EnemySpecies } from '../objects/EnemyIntent';
 
 export default class BattleScene extends Phaser.Scene {
     private timeline!: Timeline;

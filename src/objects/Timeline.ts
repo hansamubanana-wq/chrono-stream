@@ -1,7 +1,7 @@
 // src/objects/Timeline.ts
 import Phaser from 'phaser';
-// ★この行の { EnemySpecies } がエラーの元でした。STEP 1を直せばここも直ります。
-import EnemyIntent, { EnemySpecies } from './EnemyIntent';
+// ★ここを修正！ type をつける
+import EnemyIntent, { type EnemySpecies } from './EnemyIntent';
 
 type IntentType = 'ATTACK' | 'DEFEND';
 
