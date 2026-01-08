@@ -2,7 +2,7 @@
 import Phaser from 'phaser';
 import EnemyIntent from './EnemyIntent';
 
-// ここでも同じ型を定義してしまう（これなら読み込みエラーは起きない！）
+// 型定義（エラー回避のためここに記述）
 type IntentType = 'ATTACK' | 'DEFEND';
 
 export default class Timeline extends Phaser.GameObjects.Container {
@@ -66,12 +66,10 @@ export default class Timeline extends Phaser.GameObjects.Container {
         this.add(label);
     }
 
-    // ここで any を使って無理やり通す（安全策）
     public addIntent(scene: Phaser.Scene, index: number, type: IntentType, value: number) {
         if (index < 0 || index >= this.slotCount) return;
         if (this.intents[index]) this.intents[index]?.destroy();
 
-        // 読み込みエラー回避のため、型チェックを少し緩めます
         const intent = new EnemyIntent(scene, type as any, value);
         this.add(intent);
         
@@ -103,5 +101,46 @@ export default class Timeline extends Phaser.GameObjects.Container {
             duration: 200,
             ease: 'Power2'
         });
+    }
+
+    // --- ★新機能：ターン終了時に敵を進める ---
+    public advanceTimeline(scene: Phaser.Scene) {
+        // 1. 先頭(T0)に敵がいるか確認
+        const frontIntent = this.intents[0];
+        if (frontIntent) {
+            // イベントを発信して、シーン側に「攻撃された！」と伝える
+            this.emit('enemy_action', frontIntent.intentType, frontIntent.value);
+            
+            // アニメーションして消す
+            scene.tweens.add({
+                targets: frontIntent,
+                alpha: 0,
+                scaleX: 1.5,
+                scaleY: 1.5,
+                duration: 300,
+                onComplete: () => frontIntent.destroy()
+            });
+        }
+
+        // 2. 全員を1つずつ左にずらす (T1->T0, T2->T1...)
+        for (let i = 1; i < this.slotCount; i++) {
+            const intent = this.intents[i];
+            
+            // 前のマス(i-1)を上書き
+            this.intents[i - 1] = intent; 
+            this.intents[i] = null; // 元の場所は空に
+
+            if (intent) {
+                // アニメーションで移動
+                const targetSlot = this.slots[i - 1];
+                scene.tweens.add({
+                    targets: intent,
+                    x: targetSlot.x,
+                    y: targetSlot.y,
+                    duration: 300,
+                    ease: 'Power2'
+                });
+            }
+        }
     }
 }

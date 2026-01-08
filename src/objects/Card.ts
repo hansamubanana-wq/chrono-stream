@@ -2,12 +2,12 @@
 import Phaser from 'phaser';
 
 export default class Card extends Phaser.GameObjects.Container {
-    private cardName: string; // カードの種類を覚えておく変数
+    public cardName: string; // 外部から名前を見れるようにpublicにする
 
     constructor(scene: Phaser.Scene, x: number, y: number, text: string, color: number) {
         super(scene, x, y);
 
-        this.cardName = text; // 名前を保存（例："Push"）
+        this.cardName = text;
 
         const width = 120;
         const height = 180;
@@ -37,40 +37,28 @@ export default class Card extends Phaser.GameObjects.Container {
 
         // ホバー時の動き
         this.on('pointerover', () => {
-            scene.tweens.add({
-                targets: this,
-                scaleX: 1.1,
-                scaleY: 1.1,
-                y: y - 20,
-                duration: 100,
-                ease: 'Power1'
-            });
+            this.y -= 20; // シンプルに座標操作だけにする（Tweenが重複するとバグりやすいため）
             scene.children.bringToTop(this);
         });
 
-        // ホバー解除時の動き
+        // ホバー解除
         this.on('pointerout', () => {
-            scene.tweens.add({
-                targets: this,
-                scaleX: 1.0,
-                scaleY: 1.0,
-                y: y,
-                duration: 100,
-                ease: 'Power1'
-            });
+            this.y += 20;
         });
 
-        // クリック時の動き
+        // ★変更点：クリックされたら「即発動」せず、「選択されたよ」と報告するだけ
         this.on('pointerdown', () => {
-            this.playUseAnimation(scene);
+            // 'card_clicked' というイベントで、自分自身(this)を送る
+            scene.events.emit('card_clicked', this);
         });
     }
 
-    // カード使用アニメーション
-    playUseAnimation(scene: Phaser.Scene) {
-        this.disableInteractive(); // 連打防止
+    // ★新機能：外部から「使われたよ」と命令されたら動く
+    playUseAnimation() {
+        this.disableInteractive(); // もう押せないようにする
 
-        scene.tweens.add({
+        // シーン(this.scene)を使ってアニメーション
+        this.scene.tweens.add({
             targets: this,
             y: this.y - 100,
             alpha: 0,
@@ -78,12 +66,8 @@ export default class Card extends Phaser.GameObjects.Container {
             scaleY: 1.2,
             duration: 300,
             onComplete: () => {
-                // ★ここが重要：使い終わったらシーンに通知を送る！
-                // "use_card" というイベント名で、このカードの名前を送ります
-                scene.events.emit('use_card', this.cardName);
-                
-                // テスト用にカードを復活させる
-                this.resetCard(); 
+                // アニメーション完了後、テスト用に復活させる
+                this.resetCard();
             }
         });
     }
